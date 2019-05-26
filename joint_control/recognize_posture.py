@@ -46,9 +46,10 @@ class PostureRecognitionAgent(AngleInterpolationAgent):
         data.append(perception.joint['RKneePitch'])
         data.append(perception.imu[0])
         data.append(perception.imu[1])
-        
+        data = numpy.array(data).reshape(1, -1)
+        # print(data)
         posture = self.posture_classifier.predict(data)
-		
+	print (posture)
         return posture
 
 if __name__ == '__main__':
