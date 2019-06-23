@@ -12,9 +12,19 @@
 
 from forward_kinematics import ForwardKinematicsAgent
 from numpy.matlib import identity
+from numpy import random
+import numpy as np 
+from autograd import grad    
 
 
 class InverseKinematicsAgent(ForwardKinematicsAgent):
+    
+    def error_func(self,theta, target,effector_name):
+        ts = self.forward_kinematics(self.chains[effector_name])
+        te = ts[-1]
+        e = target - te
+        return np.sum(e*e)
+        
     def inverse_kinematics(self, effector_name, transform):
         '''solve the inverse kinematics
 
@@ -22,7 +32,22 @@ class InverseKinematicsAgent(ForwardKinematicsAgent):
         :param transform: 4x4 transform matrix
         :return: list of joint angles
         '''
+        N = len(self.chains[effector_name]) - 1 #amount of links
+        theta = random.random(N)
         joint_angles = []
+        for name in self.chains[effector_name]:
+            joint_angles[name] = self.perception.joint[name]
+        
+        func = lambda t: error_func(t, transform)
+        func_grad = grad(func)
+        for i in range(1000):
+            e = func(theta)
+            d = func_grad(theta)
+            theta -= d * 1e-2
+            if e < 1e-4:
+                break
+    
+        return theta
         # YOUR CODE HERE
         return joint_angles
 
@@ -30,7 +55,16 @@ class InverseKinematicsAgent(ForwardKinematicsAgent):
         '''solve the inverse kinematics and control joints use the results
         '''
         # YOUR CODE HERE
-        self.keyframes = ([], [], [])  # the result joint angles have to fill in
+        joint_angles = self.inverse_kinematics(effector_name, transform)
+
+        names = self.chains[effector_name]
+        times = [[0, 5]] * len(names)
+        keys = []
+        for i, name in enumerate(names):
+            keys.insert(i, [[self.perception.joint[name], [3, 0, 0]], [joint_angles[name], [3, 0, 0]]])
+
+        self.keyframes = (names, times, keys) 
+
 
 if __name__ == '__main__':
     agent = InverseKinematicsAgent()
