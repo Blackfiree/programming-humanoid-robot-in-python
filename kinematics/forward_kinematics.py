@@ -118,7 +118,6 @@ class ForwardKinematicsAgent(AngleInterpolationAgent):
                 [0,0,0,1],
                 ])
             T = np.dot(Y,P)
-        print (T)
 
         return T
 
