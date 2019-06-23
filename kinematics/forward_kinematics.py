@@ -19,11 +19,13 @@
 import os
 import sys
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'joint_control'))
-
 from numpy.matlib import matrix, identity
+import numpy as np
 
 from angle_interpolation import AngleInterpolationAgent
 
+from keyframes import hello
+import math
 
 class ForwardKinematicsAgent(AngleInterpolationAgent):
     def __init__(self, simspark_ip='localhost',
@@ -35,9 +37,32 @@ class ForwardKinematicsAgent(AngleInterpolationAgent):
         self.transforms = {n: identity(4) for n in self.joint_names}
 
         # chains defines the name of chain and joints of the chain
-        self.chains = {'Head': ['HeadYaw', 'HeadPitch']
-                       # YOUR CODE HERE
+        # http://doc.aldebaran.com/2-1/family/robots/bodyparts.html#effector-chain
+        self.chains = {'Head': ['HeadYaw', 'HeadPitch'],
+                       'LArm': ['LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll'],
+                       'LLeg': ['LHipYawPitch', 'LHipRoll', 'LHipPitch', 'LKneePitch', 'LAnklePitch' , 'LAnkleRoll'],
+                       'RLeg': ['RHipYawPitch', 'RHipRoll', 'RHipPitch', 'RKneePitch', 'RAnklePitch' , 'RAnkleRoll'],
+                       'RArm': ['RShoulderPitch', 'RShoulderRoll', 'RElbowYaw', 'RElbowRoll']
                        }
+        # Starts from the offset of the torso 
+        # From -> To
+                      # Head
+        self.links = {'HeadYaw': [0,0,126.5], 'HeadPitch': [0,0,0],
+                      # LeftArm
+                      'LShoulderPitch': [0,98,100], 'LShoulderRoll': [0,0,0],
+                      'LElbowYaw': [105,15,0], 'LElbowRoll': [0,0,0],
+                      # RightArm
+                      'RShoulderPitch': [0,-98,100], 'RShoulderRoll': [0,0,0],
+                      'RElbowYaw': [105,-15,0], 'RElbowRoll': [0,0,0],
+                      # LeftLeg
+                      'LHipYawPitch': [0,50,-85], 'LHipRoll': [0,0,0],
+                      'LHipPitch': [0,0,0], 'LKneePitch': [0,0,-100],
+                      'LAnklePitch': [0,0,-102.9], 'LAnkleRoll': [0,0,0],
+                      # RightLeg
+                      'RHipYawPitch': [0,-50,-85], 'RHipRoll': [0,0,0],
+                      'RHipPitch': [0,0,0], 'RKneePitch': [0,0,-100],
+                      'RAnklePitch': [0,0,-102.9], 'RAnkleRoll': [0,0,0]
+                     }
 
     def think(self, perception):
         self.forward_kinematics(perception.joint)
@@ -53,6 +78,47 @@ class ForwardKinematicsAgent(AngleInterpolationAgent):
         '''
         T = identity(4)
         # YOUR CODE HERE
+        s = math.sin(joint_angle)
+        c = math.sin(joint_angle)
+
+        # Roll = X Pitch = Y Yaw = Z
+
+        if joint_name.endswith("Roll"):
+            T = matrix([
+                [1,0,0,self.links[joint_name][0]],
+                [0,c,-s,self.links[joint_name][1]],
+                [0,s,c,self.links[joint_name][2]],
+                [0,0,0,1],
+                ])
+        if joint_name.endswith("Pitch"):
+            T = matrix([
+                [c,0,s,self.links[joint_name][0]],
+                [0,1,0,self.links[joint_name][1]],
+                [-s,0,c,self.links[joint_name][2]],
+                [0,0,0,1],
+                ])
+        if joint_name.endswith("Yaw"):
+            T = matrix([
+                [c,s,0,self.links[joint_name][0]],
+                [-s,c,0,self.links[joint_name][1]],
+                [0,0,1,self.links[joint_name][2]],
+                [0,0,0,1],
+                ])
+        if joint_name.endswith("YawPitch"):
+            Y = matrix([
+                [c,s,0,self.links[joint_name][0]],
+                [-s,c,0,self.links[joint_name][1]],
+                [0,0,1,self.links[joint_name][2]],
+                [0,0,0,1],
+                ])
+            P = matrix([
+                [c,0,s,self.links[joint_name][0]],
+                [0,1,0,self.links[joint_name][1]],
+                [-s,0,c,self.links[joint_name][2]],
+                [0,0,0,1],
+                ])
+            T = np.dot(Y,P)
+        print (T)
 
         return T
 
@@ -67,9 +133,11 @@ class ForwardKinematicsAgent(AngleInterpolationAgent):
                 angle = joints[joint]
                 Tl = self.local_trans(joint, angle)
                 # YOUR CODE HERE
+                T = T * Tl
 
                 self.transforms[joint] = T
 
 if __name__ == '__main__':
     agent = ForwardKinematicsAgent()
+    agent.keyframes = hello()
     agent.run()
